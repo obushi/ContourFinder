@@ -1,0 +1,11 @@
+<settings>
+    <homographyMatrixValue0,0>-1.412562966</homographyMatrixValue0,0>
+    <homographyMatrixValue0,1>15.232773781</homographyMatrixValue0,1>
+    <homographyMatrixValue0,2>-2479.658691406</homographyMatrixValue0,2>
+    <homographyMatrixValue1,0>-4.969892979</homographyMatrixValue1,0>
+    <homographyMatrixValue1,1>5.450850010</homographyMatrixValue1,1>
+    <homographyMatrixValue1,2>1867.236816406</homographyMatrixValue1,2>
+    <homographyMatrixValue2,0>-0.001512305</homographyMatrixValue2,0>
+    <homographyMatrixValue2,1>0.009011426</homographyMatrixValue2,1>
+    <homographyMatrixValue2,2>1.000000000</homographyMatrixValue2,2>
+</settings>
