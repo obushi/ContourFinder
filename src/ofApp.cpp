@@ -1,45 +1,76 @@
 #include "ofApp.h"
-
+using namespace ofxCv;
+using namespace cv;
 
 void ofApp::setup(){
+    
     ofSetFrameRate(120);
     ofSetVerticalSync(true);
     
     currentStatus = Status::Setup;
     
-    blackMagic.setup(srcVideoWidth, srcVideoHeight, srcVideoFPS);
+    blackMagic.setup(cameraWidth, cameraHeight, cameraFramerate);
     
     willLearnBg = true;
     isMaskedBlack = false;
     isMaskedWhite = false;
     thresh = 80;
-    bgGrayImg.allocate(srcVideoWidth, srcVideoHeight);
-    diffGrayImg.allocate(srcVideoWidth, srcVideoHeight);
+    bgGrayImg.allocate(cameraWidth, cameraHeight);
+    srcGrayImg.allocate(cameraWidth, cameraHeight);
+    diffGrayImg.allocate(cameraWidth, cameraHeight);
     
     selectedCorner = -1;
     
-    oFSrcPoints = {
-        cv::Point2f(cornerPinRadius, cornerPinRadius),
-        cv::Point2f(dstVideoWidth - cornerPinRadius, cornerPinRadius),
-        cv::Point2f(dstVideoWidth - cornerPinRadius, dstVideoHeight - cornerPinRadius),
-        cv::Point2f(cornerPinRadius, dstVideoHeight - cornerPinRadius)
+    ofPinCoords = {
+        ofVec2f(cornerPinRadius, cornerPinRadius),
+        ofVec2f(projectorWidth - cornerPinRadius, cornerPinRadius),
+        ofVec2f(projectorWidth - cornerPinRadius, projectorHeight - cornerPinRadius),
+        ofVec2f(cornerPinRadius, projectorHeight - cornerPinRadius)
     };
     
-    oFDstPoints = {
-        cv::Point2f(0, 0),
-        cv::Point2f(dstVideoWidth, 0),
-        cv::Point2f(dstVideoWidth, dstVideoHeight),
-        cv::Point2f(0, dstVideoHeight)
+    ofVideoCorners = {
+        ofVec2f(0, 0),
+        ofVec2f(cameraWidth, 0),
+        ofVec2f(cameraWidth, cameraHeight),
+        ofVec2f(0, cameraHeight)
     };
     
-    unityPoints = {
-        cv::Point2f(-unityScreenSize.x/2, unityScreenSize.y/2),
-        cv::Point2f(unityScreenSize.x/2, unityScreenSize.y/2),
-        cv::Point2f(unityScreenSize.x/2, -unityScreenSize.y/2),
-        cv::Point2f(-unityScreenSize.x/2, -unityScreenSize.y/2)
+    ofWindowCorners = {
+        ofVec2f(0, 0),
+        ofVec2f(projectorWidth, 0),
+        ofVec2f(projectorWidth, projectorHeight),
+        ofVec2f(0, projectorHeight)
     };
     
-    cv::findHomography(oFDstPoints, unityPoints).convertTo(oF2UnityMat, CV_32FC1);
+    unityWorldCorners = {
+        ofVec2f(-unityWorldSize.x/2, unityWorldSize.y/2),
+        ofVec2f(unityWorldSize.x/2, unityWorldSize.y/2),
+        ofVec2f(unityWorldSize.x/2, -unityWorldSize.y/2),
+        ofVec2f(-unityWorldSize.x/2, -unityWorldSize.y/2)
+    };
+    
+    contourFinder.setMaxArea(cameraWidth * cameraHeight * 0.5);
+    contourFinder.setMinArea(cameraWidth * cameraHeight * 0.01);
+    contourFinder.setFindHoles(false);
+    contourFinder.setThreshold(thresh);
+    
+    shader.load("shaders/warpPerspective");
+    fbo.allocate(projectorWidth, projectorHeight);
+    
+    cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
+    m = m.inv();
+    warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
+                   m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
+                   m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
+    
+    cv::Mat m2 = cv::getPerspectiveTransform(ofxCv::toCv(ofVideoCorners), ofxCv::toCv(ofWindowCorners));
+    m2 = m2.inv();
+    resizeMatrix.set(m2.at<double>(0,0), m2.at<double>(1,0), m2.at<double>(2,0),
+                     m2.at<double>(0,1), m2.at<double>(1,1), m2.at<double>(2,1),
+                     m2.at<double>(0,2), m2.at<double>(1,2), m2.at<double>(2,2));
+    
+    plane.set(projectorWidth, projectorHeight);
+    plane.setPosition(projectorWidth/2, projectorHeight/2, 0);
     
     udpConnection.Create();
     udpConnection.Connect("127.0.0.1", 11999);
@@ -61,35 +92,30 @@ void ofApp::update(){
         
         diffGrayImg.absDiff(bgGrayImg, srcGrayImg);
         diffGrayImg.threshold(thresh);
-        contourFinder.findContours(diffGrayImg, 1000, 1280*720*0.5, 10, true);
+        diffGrayImg.updateTexture();
         
-        if (homographyMat.empty())
-        {
-            if (currentStatus == Status::Play)
-                ofLogWarning() << "Homography Matrix is not set";
-            return;
-        }
+        fbo.begin();
+        shader.begin();
+        diffGrayImg.getTexture().setTextureWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
+        diffGrayImg.getTexture().bind();
+        plane.mapTexCoordsFromTexture(diffGrayImg.getTexture());
+        shader.setUniformMatrix3f("warpMatrix", warpMatrix);
+        shader.setUniformMatrix3f("resizeMatrix", resizeMatrix);
+        plane.draw();
+        diffGrayImg.getTexture().unbind();
+        shader.end();
+        fbo.end();
         
-        // Destroy all polygons
+        fbo.readToPixels(pixels);
+        contourFinder.findContours(ofxCv::toCv(pixels));
+        
         for (int i = 0; i < maxBlobsCount; ++i)
         {
             polylines[i].clear();
         }
         
-        // Create polygons
-        for (int i = 0; i < contourFinder.blobs.size(); ++i)
-        {
-            for (int j = 0; j < contourFinder.blobs[i].pts.size(); ++j)
-            {
-                cv::Point3f point = ofxCv::toCv(ofVec3f(contourFinder.blobs[i].pts[j].x * 0.8, contourFinder.blobs[i].pts[j].y * 1.067, 1.0));
-                cv::Mat srcMat = cv::Mat(point, CV_32FC1);
-                cv::Mat dstMat = homographyMat * srcMat;
-                dstMat /= dstMat.at<float>(0, 2);
-                
-                ofVec2f vertex = ofVec2f(dstMat.at<float>(0, 0), dstMat.at<float>(0, 1));
-                polylines[i].addVertex(vertex);
-                
-            }
+        for (int i = 0; i < contourFinder.size(); ++i) {
+            polylines[i] = contourFinder.getPolyline(i);
             polylines[i].setClosed(false);
             polylines[i].simplify(10);
         }
@@ -101,7 +127,15 @@ void ofApp::update(){
 }
 
 void ofApp::draw(){
-    ofPolyline polyline = ofxCv::toOf(oFSrcPoints);
+    
+    ofPolyline polyline;
+    polyline.resize(ofPinCoords.size());
+    for (int i = 0; i < ofPinCoords.size(); ++i)
+    {
+        polyline[i].x = ofPinCoords[i].x;
+        polyline[i].y = ofPinCoords[i].y;
+    }
+    polyline.close();
     polyline.setClosed(true);
     
     switch (currentStatus) {
@@ -111,7 +145,7 @@ void ofApp::draw(){
             {
                 ofPushStyle();
                 ofSetColor(0);
-                ofDrawRectangle(0, 0, dstVideoWidth, dstVideoHeight);
+                ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
                 ofPopStyle();
             }
             
@@ -119,26 +153,20 @@ void ofApp::draw(){
             {
                 ofPushStyle();
                 ofSetColor(255);
-                ofDrawRectangle(0, 0, dstVideoWidth, dstVideoHeight);
+                ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
                 ofPopStyle();
             }
             
             else
             {
-                ofPushStyle();
-                ofSetColor(255);
-                ofDrawRectangle(0, 0, dstVideoWidth, dstVideoHeight);
-                ofPopStyle();
-                
-                diffGrayImg.draw(0, 0, dstVideoWidth, dstVideoHeight);
-                contourFinder.draw(0, 0, dstVideoWidth, dstVideoHeight);
+                fbo.draw(0, 0);
                 
                 ofPushStyle();
                 ofSetLineWidth(3);
-                ofSetColor(ofColor::bisque);
+                ofSetColor(ofColor::gray);
                 
                 polyline.draw();
-                for (auto p : oFSrcPoints)
+                for (auto p : ofPinCoords)
                 {
                     ofDrawCircle(p.x, p.y, cornerPinRadius);
                 }
@@ -153,7 +181,7 @@ void ofApp::draw(){
             ofSetLineWidth(5);
             ofSetColor(ofColor::gray);
             
-            for (int i = 0; i < contourFinder.blobs.size(); ++i)
+            for (int i = 0; i < MIN(maxBlobsCount, contourFinder.size()); ++i)
             {
                 polylines[i].draw();
             }
@@ -182,16 +210,22 @@ void ofApp::keyPressed(int key){
             
         case OF_KEY_RETURN:
         {
-            cv::findHomography(oFSrcPoints, oFDstPoints).convertTo(homographyMat, CV_32FC1);
-            ofLog() << "homographyMatrix:\n" << homographyMat;
+            cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
+            m = m.inv();
             
-            for (int y = 0; y < homographyMat.rows; ++y)
-            {
-                for (int x = 0; x < homographyMat.cols; ++x)
-                {
-                    settings.setValue("settings:homographyMatrixValue" + ofToString(y) + "," + ofToString(x), homographyMat.at<float>(y, x));
-                }
-            }
+            warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
+                           m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
+                           m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
+
+            settings.setValue("a", warpMatrix.a);
+            settings.setValue("b", warpMatrix.b);
+            settings.setValue("c", warpMatrix.c);
+            settings.setValue("d", warpMatrix.d);
+            settings.setValue("e", warpMatrix.e);
+            settings.setValue("f", warpMatrix.f);
+            settings.setValue("g", warpMatrix.g);
+            settings.setValue("h", warpMatrix.h);
+            settings.setValue("i", warpMatrix.i);
             settings.saveFile("settings.xml");
             break;
         }
@@ -227,22 +261,27 @@ void ofApp::keyPressed(int key){
 void ofApp::mouseDragged(int x, int y, int button){
     if (selectedCorner >= 0 && selectedCorner < 4)
     {
-        oFSrcPoints[selectedCorner].x = x;
-        oFSrcPoints[selectedCorner].y = y;
+        ofPinCoords[selectedCorner].x = x;
+        ofPinCoords[selectedCorner].y = y;
     }
     
     ofPolyline polyline;
-    for (auto p : oFSrcPoints)
+    for (auto p : ofPinCoords)
     {
-        polyline.addVertex(ofxCv::toOf(p));
+        polyline.addVertex(p);
     }
     
-    oFSrcRect = polyline.getBoundingBox();
+    cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
+    m = m.inv();
+    
+    warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
+                   m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
+                   m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
 }
 
 void ofApp::mousePressed(int x, int y, int button){
-    for (int i = 0; i < oFSrcPoints.size(); ++i) {
-        if (ofPoint(x,y).distance(ofPoint(oFSrcPoints[i].x, oFSrcPoints[i].y)) < cornerPinRadius)
+    for (int i = 0; i < ofPinCoords.size(); ++i) {
+        if (ofPoint(x,y).distance(ofPoint(ofPinCoords[i].x, ofPinCoords[i].y)) < cornerPinRadius)
         {
             selectedCorner = i;
             break;
@@ -262,18 +301,14 @@ void ofApp::exit(ofEventArgs &args)
 void ofApp::sendVertices(std::array<ofPolyline, maxBlobsCount> vertices)
 {
     string msg;
-    
     for (int i = 0; i < maxBlobsCount; ++i)
     {
         msg = ofToString(i);
             
         for (int j = 0; j < polylines[i].getVertices().size(); ++j)
         {
-            cv::Point3f point = ofxCv::toCv(ofVec3f(polylines[i].getVertices()[j].x, polylines[i].getVertices()[j].y, 1));
-            cv::Mat srcMat = cv::Mat(point, CV_32FC1);
-            cv::Mat dstMat = oF2UnityMat * srcMat;
-            dstMat /= dstMat.at<float>(0, 2);
-            ofVec2f pos = ofVec2f(dstMat.at<float>(0, 0), dstMat.at<float>(0, 1));
+            ofVec2f p(polylines[i].getVertices()[j].x, polylines[i].getVertices()[j].y);
+            ofVec2f pos = ofVec3f(ofMap(p.x, 0.0, projectorWidth, -unityWorldSize.x/2, unityWorldSize.x/2), ofMap(p.y, 0.0, projectorHeight, unityWorldSize.y/2, -unityWorldSize.y/2));
             msg += "|" + ofToString(pos.x, 3) + "," + ofToString(pos.y, 3);
         }
         udpConnection.Send(msg.c_str(), msg.length());

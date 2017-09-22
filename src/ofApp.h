@@ -23,30 +23,27 @@ class ofApp : public ofBaseApp{
         void exit(ofEventArgs &args);
     
     private:
-    
-        // Constants
-        static const int maxBlobsCount     = 10;
-        static const int srcVideoWidth     = 1280;
-        static const int srcVideoHeight    = 720;
-        constexpr static float srcVideoFPS = 59.94f;
-        static const int dstVideoWidth     = 1024;
-        static const int dstVideoHeight    = 768;
-        static const int cornerPinRadius   = 12;
-        const ofVec2f unityScreenSize = ofVec2f(20, 15);
-    
         enum Status {
             Setup, Play
         };
-        
+    
         Status currentStatus;
+    
+        // Constants
+        static const int maxBlobsCount     = 10;
+        static const int cameraWidth     = 1280;
+        static const int cameraHeight    = 720;
+        constexpr static float cameraFramerate = 59.94f;
+        static const int projectorWidth     = 1024;
+        static const int projectorHeight    = 768;
+        static const int cornerPinRadius   = 12;
+        const ofVec2f unityWorldSize = ofVec2f(20, 15);
         
         // TransformMatrix
-        cv::Mat homographyMat;
-        cv::Mat oF2UnityMat;
-        std::vector<cv::Point2f> oFSrcPoints;
-        std::vector<cv::Point2f> oFDstPoints;
-        std::vector<cv::Point2f> unityPoints;
-        ofRectangle oFSrcRect;
+        std::vector<ofVec2f> ofPinCoords;
+        std::vector<ofVec2f> ofVideoCorners;
+        std::vector<ofVec2f> ofWindowCorners;
+        std::vector<ofVec2f> unityWorldCorners;
         ofxXmlSettings settings;
         int selectedCorner;
         
@@ -55,9 +52,15 @@ class ofApp : public ofBaseApp{
         bool                isMaskedWhite;
         bool                willLearnBg;
         int                 thresh;
+        ofShader            shader;
+        ofFbo               fbo;
+        ofPixels            pixels;
+        ofMatrix3x3         warpMatrix;
+        ofMatrix3x3         resizeMatrix;
+        ofPlanePrimitive    plane;
         ofxBlackMagic       blackMagic;
         ofxCvGrayscaleImage srcGrayImg, bgGrayImg, diffGrayImg;
-        ofxCvContourFinder  contourFinder;
+        ofxCv::ContourFinder  contourFinder;
         std::array<ofPolyline, maxBlobsCount> polylines;
     
         // UDPSender
