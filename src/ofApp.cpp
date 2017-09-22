@@ -7,14 +7,31 @@ void ofApp::setup(){
     ofSetFrameRate(120);
     ofSetVerticalSync(true);
     
+    gui.setup();
+    gui.add(fps.set("fps", ""));
+    gui.add(threashold.set("threashold", 80, 0, 150));
+    gui.add(maxBlobsCount.set("maxBlobsCount", 10, 0, 50));
+    gui.add(polylinesSimplicity.set("polylinesSimplicity", 10, 0, 20));
+    gui.add(cornerPinRadius.set("cornerPinRadius", 12, 1, 50));
+    gui.add(captureAreaBorderWidth.set("captureAreaBorderWidth", 3, 1, 50));
+    
+    maxBlobsCount.addListener(this, &ofApp::maxBlobsCountChanged);
+    polylines.resize(maxBlobsCount);
+    
+    settings.cameraWidth      = 1280;
+    settings.cameraHeight     = 720;
+    settings.cameraFramerate  = 59.94f;
+    settings.projectorWidth   = 1024;
+    settings.projectorHeight  = 768;
+    settings.unityWorldWidth  = 20.0f;
+    settings.unityWorldHeight = 15.0f;
+    
     currentStatus = Status::Setup;
     
     blackMagic.setup(cameraWidth, cameraHeight, cameraFramerate);
     
     willLearnBg = true;
-    isMaskedBlack = false;
     isMaskedWhite = false;
-    thresh = 80;
     bgGrayImg.allocate(cameraWidth, cameraHeight);
     srcGrayImg.allocate(cameraWidth, cameraHeight);
     diffGrayImg.allocate(cameraWidth, cameraHeight);
@@ -134,22 +151,13 @@ void ofApp::draw(){
     switch (currentStatus) {
         case Status::Setup :
         {
-            if (isMaskedBlack)
-            {
-                ofPushStyle();
-                ofSetColor(0);
-                ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
-                ofPopStyle();
-            }
-            
-            else if (isMaskedWhite)
+            if (isMaskedWhite)
             {
                 ofPushStyle();
                 ofSetColor(255);
                 ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
                 ofPopStyle();
             }
-            
             else
             {
                 fbo.draw(0, 0);
@@ -165,7 +173,6 @@ void ofApp::draw(){
                 }
                 ofPopStyle();
             }
-            
             break;
         }
             
@@ -210,16 +217,16 @@ void ofApp::keyPressed(int key){
                            m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
                            m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
 
-            settings.setValue("a", warpMatrix.a);
-            settings.setValue("b", warpMatrix.b);
-            settings.setValue("c", warpMatrix.c);
-            settings.setValue("d", warpMatrix.d);
-            settings.setValue("e", warpMatrix.e);
-            settings.setValue("f", warpMatrix.f);
-            settings.setValue("g", warpMatrix.g);
-            settings.setValue("h", warpMatrix.h);
-            settings.setValue("i", warpMatrix.i);
-            settings.saveFile("settings.xml");
+            xmlSettings.setValue("a", warpMatrix.a);
+            xmlSettings.setValue("b", warpMatrix.b);
+            xmlSettings.setValue("c", warpMatrix.c);
+            xmlSettings.setValue("d", warpMatrix.d);
+            xmlSettings.setValue("e", warpMatrix.e);
+            xmlSettings.setValue("f", warpMatrix.f);
+            xmlSettings.setValue("g", warpMatrix.g);
+            xmlSettings.setValue("h", warpMatrix.h);
+            xmlSettings.setValue("i", warpMatrix.i);
+            xmlSettings.saveFile("settings.xml");
             break;
         }
             
@@ -291,7 +298,7 @@ void ofApp::exit(ofEventArgs &args)
     blackMagic.close();
 }
 
-void ofApp::sendVertices(std::array<ofPolyline, maxBlobsCount> vertices)
+void ofApp::sendVertices(std::vector<ofPolyline> vertices)
 {
     string msg;
     for (int i = 0; i < maxBlobsCount; ++i)
@@ -306,4 +313,9 @@ void ofApp::sendVertices(std::array<ofPolyline, maxBlobsCount> vertices)
         }
         udpConnection.Send(msg.c_str(), msg.length());
     }
+}
+
+void ofApp::maxBlobsCountChanged(int &maxBlobsCount)
+{
+    polylines.resize(maxBlobsCount);
 }
