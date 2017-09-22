@@ -63,12 +63,6 @@ void ofApp::setup(){
                    m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
                    m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
     
-    cv::Mat m2 = cv::getPerspectiveTransform(ofxCv::toCv(ofVideoCorners), ofxCv::toCv(ofWindowCorners));
-    m2 = m2.inv();
-    resizeMatrix.set(m2.at<double>(0,0), m2.at<double>(1,0), m2.at<double>(2,0),
-                     m2.at<double>(0,1), m2.at<double>(1,1), m2.at<double>(2,1),
-                     m2.at<double>(0,2), m2.at<double>(1,2), m2.at<double>(2,2));
-    
     plane.set(projectorWidth, projectorHeight);
     plane.setPosition(projectorWidth/2, projectorHeight/2, 0);
     
@@ -100,7 +94,6 @@ void ofApp::update(){
         diffGrayImg.getTexture().bind();
         plane.mapTexCoordsFromTexture(diffGrayImg.getTexture());
         shader.setUniformMatrix3f("warpMatrix", warpMatrix);
-        shader.setUniformMatrix3f("resizeMatrix", resizeMatrix);
         plane.draw();
         diffGrayImg.getTexture().unbind();
         shader.end();
