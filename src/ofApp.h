@@ -56,7 +56,6 @@ class ofApp : public ofBaseApp{
         ofFbo               fbo;
         ofPixels            pixels;
         ofMatrix3x3         warpMatrix;
-        ofMatrix3x3         resizeMatrix;
         ofPlanePrimitive    plane;
         ofxBlackMagic       blackMagic;
         ofxCvGrayscaleImage srcGrayImg, bgGrayImg, diffGrayImg;
