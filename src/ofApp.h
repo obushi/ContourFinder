@@ -1,13 +1,11 @@
 #pragma once
 
 #include "ofMain.h"
-#include "ofxNetwork.h"
 #include "ofxGui.h"
-#include "ofxXmlSettings.h"
-#include "ofxOpenCv.h"
-#include "ofxCv.h"
-#include "ofxBlackMagic.h"
-#include <random>
+#include "Settings.hpp"
+#include "VideoSource.hpp"
+#include "ContoursExtractor.hpp"
+#include "ContoursSender.hpp"
 
 class ofApp : public ofBaseApp{
 
@@ -15,64 +13,40 @@ class ofApp : public ofBaseApp{
 		void setup();
 		void update();
 		void draw();
-
 		void keyPressed(int key);
 		void mouseDragged(int x, int y, int button);
 		void mousePressed(int x, int y, int button);
-		void windowResized(int w, int h);
         void exit(ofEventArgs &args);
     
     private:
-        enum Status {
+        void initializeCorners();
+    
+        enum Status{
             Setup, Play
         };
-    
-        struct Settings {
-            int cameraWidth;
-            int cameraHeight;
-            float cameraFramerate;
-            int projectorWidth;
-            int projectorHeight;
-            float unityWorldWidth;
-            float unityWorldHeight;
-        };
-    
         Status currentStatus;
-        Settings settings;
     
-        // GUI
         ofxPanel gui;
         ofParameter<std::string> fps;
-        ofParameter<int> threashold;
-        ofParameter<int> maxBlobsCount;
-        ofParameter<int> polylinesSimplicity;
-        ofParameter<int> cornerPinRadius;
-        ofParameter<int> captureAreaBorderWidth;
-        void maxBlobsCountChanged(int &maxBlobsCount);
+        ofParameter<bool> udpEnabled;
+        ofParameter<int>  threashold;
+        ofParameter<int>  maxBlobsCount;
+        ofParameter<int>  polylinesSimplicity;
+        ofParameter<int>  cornerPinRadius;
+        void threasholdChanged(int & threashold);
+        void maxBlobsCountChanged(int & maxBlobsCount);
+        void polylinesSimplicityChanged(int & polylinesSimplicity);
     
-        // TransformMatrix
-        std::vector<ofVec2f> ofPinCoords;
+        contourfinder::Settings          settings;
+        contourfinder::VideoSource       videoSource;
+        contourfinder::ContoursExtractor contoursExtractor;
+        contourfinder::ContoursSender    contoursSender;
+
+        std::vector<ofVec2f> ofCaptureAreaCorners;
         std::vector<ofVec2f> ofVideoCorners;
         std::vector<ofVec2f> ofWindowCorners;
         std::vector<ofVec2f> unityWorldCorners;
-        ofxXmlSettings xmlSettings;
-        int selectedCorner;
-        
-        // ImageProcessor
-        bool                isMaskedWhite;
-        bool                willLearnBg;
-        ofShader            shader;
-        ofFbo               fbo;
-        ofPixels            pixels;
-        ofMatrix3x3         warpMatrix;
-        ofPlanePrimitive    plane;
-        ofxBlackMagic       blackMagic;
-        ofxCvGrayscaleImage srcGrayImg, bgGrayImg, diffGrayImg;
-        ofxCv::ContourFinder  contourFinder;
-        std::vector<ofPolyline> polylines;
-    
-        // UDPSender
-        ofxUDPManager udpConnection;
-        void sendVertices(std::vector<ofPolyline> vertices);
-        bool enableUDP;
+        int  selectedCorner;
+        bool isMaskedWhite;
+        bool drawGui;
 };
