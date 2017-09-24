@@ -1,198 +1,94 @@
 #include "ofApp.h"
-using namespace ofxCv;
-using namespace cv;
 
 void ofApp::setup(){
-    
     ofSetFrameRate(120);
-    ofSetVerticalSync(true);
+    ofSetVerticalSync(false);
+    
+    threashold.addListener(this, & ofApp::threasholdChanged);
+    maxBlobsCount.addListener(this, & ofApp::maxBlobsCountChanged);
+    polylinesSimplicity.addListener(this, & ofApp::polylinesSimplicityChanged);
+    
+    gui.setup();
+    gui.add(fps.set("fps", ""));
+    gui.add(threashold.set("threashold", 80, 0, 150));
+    gui.add(maxBlobsCount.set("maxBlobsCount", 10, 0, 50));
+    gui.add(polylinesSimplicity.set("polylinesSimplicity", 10, 0, 20));
+    gui.add(cornerPinRadius.set("cornerPinRadius", 12, 1, 50));
+    
+    initializeCorners();
     
     currentStatus = Status::Setup;
-    
-    blackMagic.setup(cameraWidth, cameraHeight, cameraFramerate);
-    
-    willLearnBg = true;
-    isMaskedBlack = false;
-    isMaskedWhite = false;
-    thresh = 80;
-    bgGrayImg.allocate(cameraWidth, cameraHeight);
-    srcGrayImg.allocate(cameraWidth, cameraHeight);
-    diffGrayImg.allocate(cameraWidth, cameraHeight);
-    
     selectedCorner = -1;
+    isMaskedWhite = false;
+    drawGui = true;
     
-    ofPinCoords = {
-        ofVec2f(cornerPinRadius, cornerPinRadius),
-        ofVec2f(projectorWidth - cornerPinRadius, cornerPinRadius),
-        ofVec2f(projectorWidth - cornerPinRadius, projectorHeight - cornerPinRadius),
-        ofVec2f(cornerPinRadius, projectorHeight - cornerPinRadius)
-    };
-    
-    ofVideoCorners = {
-        ofVec2f(0, 0),
-        ofVec2f(cameraWidth, 0),
-        ofVec2f(cameraWidth, cameraHeight),
-        ofVec2f(0, cameraHeight)
-    };
-    
-    ofWindowCorners = {
-        ofVec2f(0, 0),
-        ofVec2f(projectorWidth, 0),
-        ofVec2f(projectorWidth, projectorHeight),
-        ofVec2f(0, projectorHeight)
-    };
-    
-    unityWorldCorners = {
-        ofVec2f(-unityWorldSize.x/2, unityWorldSize.y/2),
-        ofVec2f(unityWorldSize.x/2, unityWorldSize.y/2),
-        ofVec2f(unityWorldSize.x/2, -unityWorldSize.y/2),
-        ofVec2f(-unityWorldSize.x/2, -unityWorldSize.y/2)
-    };
-    
-    contourFinder.setMaxArea(cameraWidth * cameraHeight * 0.5);
-    contourFinder.setMinArea(cameraWidth * cameraHeight * 0.01);
-    contourFinder.setFindHoles(false);
-    contourFinder.setThreshold(thresh);
-    
-    shader.load("shaders/warpPerspective");
-    fbo.allocate(projectorWidth, projectorHeight);
-    
-    cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
-    m = m.inv();
-    warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
-                   m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
-                   m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
-    
-    plane.set(projectorWidth, projectorHeight);
-    plane.setPosition(projectorWidth/2, projectorHeight/2, 0);
-    
-    udpConnection.Create();
-    udpConnection.Connect("127.0.0.1", 11999);
-    udpConnection.SetNonBlocking(true);
-    enableUDP = false;
+    videoSource.setup(settings);
+    contoursExtractor.setup(settings);
+    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofWindowCorners);
+    contoursSender.setup(settings);
 }
 
 void ofApp::update(){
-    ofSetWindowTitle(ofToString(ofGetFrameRate()));
+    fps = ofToString(ofGetFrameRate());
     
-    if (blackMagic.update())
-    {
-        srcGrayImg.setFromPixels(blackMagic.getGrayPixels());
-        if (willLearnBg)
-        {
-            bgGrayImg = srcGrayImg;
-            willLearnBg = false;
-        }
-        
-        diffGrayImg.absDiff(bgGrayImg, srcGrayImg);
-        diffGrayImg.threshold(thresh);
-        diffGrayImg.updateTexture();
-        
-        fbo.begin();
-        shader.begin();
-        diffGrayImg.getTexture().setTextureWrap(GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER);
-        diffGrayImg.getTexture().bind();
-        plane.mapTexCoordsFromTexture(diffGrayImg.getTexture());
-        shader.setUniformMatrix3f("warpMatrix", warpMatrix);
-        plane.draw();
-        diffGrayImg.getTexture().unbind();
-        shader.end();
-        fbo.end();
-        
-        fbo.readToPixels(pixels);
-        contourFinder.findContours(ofxCv::toCv(pixels));
-        
-        for (int i = 0; i < maxBlobsCount; ++i)
-        {
-            polylines[i].clear();
-        }
-        
-        for (int i = 0; i < contourFinder.size(); ++i) {
-            polylines[i] = contourFinder.getPolyline(i);
-            polylines[i].setClosed(false);
-            polylines[i].simplify(10);
-        }
+    if(videoSource.update()){
+        contoursExtractor.update(videoSource.getGrayscalePixels());
     }
     
-    if (enableUDP) {
-        sendVertices(polylines);
+    if(udpEnabled) {
+        contoursSender.sendVertices(contoursExtractor.getPolylines(), maxBlobsCount);
     }
 }
 
 void ofApp::draw(){
-    
     ofPolyline polyline;
-    polyline.resize(ofPinCoords.size());
-    for (int i = 0; i < ofPinCoords.size(); ++i)
-    {
-        polyline[i].x = ofPinCoords[i].x;
-        polyline[i].y = ofPinCoords[i].y;
+    polyline.resize(ofCaptureAreaCorners.size());
+    for(int i = 0; i < ofCaptureAreaCorners.size(); ++i){
+        polyline[i].x = ofCaptureAreaCorners[i].x;
+        polyline[i].y = ofCaptureAreaCorners[i].y;
     }
     polyline.close();
     polyline.setClosed(true);
     
-    switch (currentStatus) {
+    switch(currentStatus){
         case Status::Setup :
-        {
-            if (isMaskedBlack)
-            {
-                ofPushStyle();
-                ofSetColor(0);
-                ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
-                ofPopStyle();
+            if(isMaskedWhite){
+                ofBackground(ofColor::white);
             }
-            
-            else if (isMaskedWhite)
-            {
+            else{
+                contoursExtractor.drawContours();
                 ofPushStyle();
-                ofSetColor(255);
-                ofDrawRectangle(0, 0, projectorWidth, projectorHeight);
-                ofPopStyle();
-            }
-            
-            else
-            {
-                fbo.draw(0, 0);
-                
-                ofPushStyle();
-                ofSetLineWidth(3);
                 ofSetColor(ofColor::gray);
-                
                 polyline.draw();
-                for (auto p : ofPinCoords)
+                for(auto & p : ofCaptureAreaCorners)
                 {
                     ofDrawCircle(p.x, p.y, cornerPinRadius);
                 }
                 ofPopStyle();
             }
-            
             break;
-        }
             
         case Status::Play :
             ofPushStyle();
-            ofSetLineWidth(5);
             ofSetColor(ofColor::gray);
-            
-            for (int i = 0; i < MIN(maxBlobsCount, contourFinder.size()); ++i)
-            {
-                polylines[i].draw();
-            }
-            
+            contoursExtractor.draw();
             ofPopStyle();
             break;
             
         default:
             break;
     }
+    
+    if(drawGui){
+        gui.draw();
+    }
 }
 
 void ofApp::keyPressed(int key){
-    switch (key) {
+    switch(key){
         case ' ':
-            willLearnBg = true;
+            contoursExtractor.toggleLearnBackground();
             break;
-            
         case 'p':
             currentStatus = Status::Play;
             break;
@@ -201,40 +97,14 @@ void ofApp::keyPressed(int key){
             currentStatus = Status::Setup;
             break;
             
-        case OF_KEY_RETURN:
-        {
-            cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
-            m = m.inv();
-            
-            warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
-                           m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
-                           m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
-
-            settings.setValue("a", warpMatrix.a);
-            settings.setValue("b", warpMatrix.b);
-            settings.setValue("c", warpMatrix.c);
-            settings.setValue("d", warpMatrix.d);
-            settings.setValue("e", warpMatrix.e);
-            settings.setValue("f", warpMatrix.f);
-            settings.setValue("g", warpMatrix.g);
-            settings.setValue("h", warpMatrix.h);
-            settings.setValue("i", warpMatrix.i);
-            settings.saveFile("settings.xml");
-            break;
-        }
-            
         case OF_KEY_LEFT:
-            thresh--;
-            std::cout << "Thresh: " << ofToString(thresh) << std::endl;
+            threashold--;
+            ofLog() << "Threshold: " << ofToString(threashold) << std::endl;
             break;
             
         case OF_KEY_RIGHT:
-            thresh++;
-            std::cout << "Thresh: " << ofToString(thresh) << std::endl;
-            break;
-            
-        case 'b':
-            isMaskedBlack = !isMaskedBlack;
+            threashold++;
+            ofLog() << "Threshold: " << ofToString(threashold) << std::endl;
             break;
             
         case 'w':
@@ -242,8 +112,8 @@ void ofApp::keyPressed(int key){
             break;
             
         case 'u':
-            enableUDP = !enableUDP;
-            std::cout << "UDP: " << ofToString(enableUDP) << std::endl;
+            udpEnabled = !udpEnabled;
+            ofLog() << "UDP: " << ofToString(udpEnabled) << std::endl;
             break;
             
         default:
@@ -252,58 +122,56 @@ void ofApp::keyPressed(int key){
 }
 
 void ofApp::mouseDragged(int x, int y, int button){
-    if (selectedCorner >= 0 && selectedCorner < 4)
-    {
-        ofPinCoords[selectedCorner].x = x;
-        ofPinCoords[selectedCorner].y = y;
+    if(selectedCorner >= 0 && selectedCorner < 4){
+        ofVec2f p = ofVec2f(x, y);
+        ofCaptureAreaCorners[selectedCorner] = p;
     }
     
     ofPolyline polyline;
-    for (auto p : ofPinCoords)
-    {
+    for(auto & p : ofCaptureAreaCorners){
         polyline.addVertex(p);
     }
     
-    cv::Mat m = cv::getPerspectiveTransform(ofxCv::toCv(ofPinCoords), ofxCv::toCv(ofWindowCorners));
-    m = m.inv();
-    
-    warpMatrix.set(m.at<double>(0,0), m.at<double>(1,0), m.at<double>(2,0),
-                   m.at<double>(0,1), m.at<double>(1,1), m.at<double>(2,1),
-                   m.at<double>(0,2), m.at<double>(1,2), m.at<double>(2,2));
+    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofWindowCorners);
 }
 
 void ofApp::mousePressed(int x, int y, int button){
-    for (int i = 0; i < ofPinCoords.size(); ++i) {
-        if (ofPoint(x,y).distance(ofPoint(ofPinCoords[i].x, ofPinCoords[i].y)) < cornerPinRadius)
-        {
-            selectedCorner = i;
+    for(const auto & p : ofCaptureAreaCorners){
+        if(ofPoint(x,y).distance(ofPoint(p.x, p.y)) < cornerPinRadius){
+            std::vector<ofVec2f>::iterator it = std::find(ofCaptureAreaCorners.begin(), ofCaptureAreaCorners.end(), p);
+            selectedCorner = std::distance(ofCaptureAreaCorners.begin(), it);
             break;
         }
     }
 }
 
-void ofApp::windowResized(int w, int h){
-
+void ofApp::exit(ofEventArgs &args){
+    videoSource.close();
 }
 
-void ofApp::exit(ofEventArgs &args)
-{
-    blackMagic.close();
+void ofApp::threasholdChanged(int & threashold){
+    contoursExtractor.setThreashold(threashold);
 }
 
-void ofApp::sendVertices(std::array<ofPolyline, maxBlobsCount> vertices)
-{
-    string msg;
-    for (int i = 0; i < maxBlobsCount; ++i)
-    {
-        msg = ofToString(i);
-            
-        for (int j = 0; j < polylines[i].getVertices().size(); ++j)
-        {
-            ofVec2f p(polylines[i].getVertices()[j].x, polylines[i].getVertices()[j].y);
-            ofVec2f pos = ofVec3f(ofMap(p.x, 0.0, projectorWidth, -unityWorldSize.x/2, unityWorldSize.x/2), ofMap(p.y, 0.0, projectorHeight, unityWorldSize.y/2, -unityWorldSize.y/2));
-            msg += "|" + ofToString(pos.x, 3) + "," + ofToString(pos.y, 3);
+void ofApp::maxBlobsCountChanged(int & maxBlobsCount){
+    contoursExtractor.setMaxblobsCount(maxBlobsCount);
+}
+
+void ofApp::polylinesSimplicityChanged(int & polylinesSimplicity){
+    contoursExtractor.setSimplicity(polylinesSimplicity);
+}
+
+void ofApp::initializeCorners(){
+    std::function<std::vector<ofVec2f>(std::vector<ofPoint>)> toVec2f = [](std::vector<ofPoint> vec3fPoints){
+        std::vector<ofVec2f> vec2fPoints;
+        for(auto p : vec3fPoints){
+            vec2fPoints.push_back(ofVec2f(p.x, p.y));
         }
-        udpConnection.Send(msg.c_str(), msg.length());
-    }
+        return vec2fPoints;
+    };
+    
+    ofVideoCorners = toVec2f(ofPolyline::fromRectangle(ofRectangle(ofPoint(0.0, 0.0), ofPoint(settings.videoWidth, settings.videoHeight))).getVertices());
+    ofWindowCorners = toVec2f(ofPolyline::fromRectangle(ofRectangle(ofPoint(0.0, 0.0), ofPoint(settings.projectorWidth, settings.projectorHeight))).getVertices());
+    unityWorldCorners = toVec2f(ofPolyline::fromRectangle(ofRectangle(ofPoint(-settings.unityWorldWidth/2, settings.unityWorldHeight/2), ofPoint(settings.unityWorldWidth/2, -settings.unityWorldHeight/2))).getVertices());
+    ofCaptureAreaCorners = toVec2f(ofPolyline::fromRectangle(ofRectangle(ofPoint(cornerPinRadius, cornerPinRadius), ofPoint(settings.projectorWidth - cornerPinRadius, settings.projectorHeight - cornerPinRadius))).getVertices());
 }
