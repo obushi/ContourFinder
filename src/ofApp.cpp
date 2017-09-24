@@ -89,6 +89,11 @@ void ofApp::keyPressed(int key){
         case ' ':
             contoursExtractor.toggleLearnBackground();
             break;
+            
+        case 'g':
+            drawGui = !drawGui;
+            break;
+            
         case 'p':
             currentStatus = Status::Play;
             break;
