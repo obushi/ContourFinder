@@ -1,6 +1,7 @@
 #include "ofApp.h"
 
 void ofApp::setup(){
+    ofSetWindowShape(settings.projectorWidth, settings.projectorHeight);
     ofSetFrameRate(120);
     ofSetVerticalSync(false);
     
