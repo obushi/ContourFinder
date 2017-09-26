@@ -11,7 +11,7 @@ namespace contourfinder{
         
         public:
             void setup(contourfinder::Settings const & settings);
-            void update(ofPixels & newFrame);
+            void update(ofxCvGrayscaleImage & newFrame);
             void toggleLearnBackground();
             void setThreashold(int threashold);
             void setSimplicity(int polylinesSimplicity);

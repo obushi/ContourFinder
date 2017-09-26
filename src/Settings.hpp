@@ -3,8 +3,8 @@
 namespace contourfinder{
     
     struct Settings{
-        const int         videoWidth       = 1280;
-        const int         videoHeight      = 720;
+        const int         videoWidth       = 1920;
+        const int         videoHeight      = 1080;
         const float       videoFramerate   = 59.94f;
         const int         projectorWidth   = 1024;
         const int         projectorHeight  = 768;

@@ -17,8 +17,8 @@ void contourfinder::ContoursExtractor::setup(contourfinder::Settings const & set
     learnBackground = true;
 }
 
-void contourfinder::ContoursExtractor::update(ofPixels & newFrame){
-    srcGrayImg.setFromPixels(newFrame);
+void contourfinder::ContoursExtractor::update(ofxCvGrayscaleImage & newFrame){
+    srcGrayImg = newFrame;
     
     if(learnBackground){
         bgGrayImg = srcGrayImg;

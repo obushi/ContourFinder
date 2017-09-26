@@ -29,6 +29,7 @@
 		6E473B311F74F0080075777D /* ContoursExtractor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6E473B2F1F74F0080075777D /* ContoursExtractor.cpp */; };
 		6E473B341F74F01C0075777D /* ContoursSender.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6E473B321F74F01C0075777D /* ContoursSender.cpp */; };
 		6E473B371F74FF120075777D /* Settings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6E473B351F74FF120075777D /* Settings.cpp */; };
+		6E473B461F78F95D0075777D /* pylon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E473B451F78F95D0075777D /* pylon.framework */; };
 		7CDAD32BE4FA46701E3552C7 /* RunningBackground.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5CBF6AED6A17AC0C17F63CC4 /* RunningBackground.cpp */; };
 		837220E80EB56CD44AD27F2A /* ofxSlider.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15F2C6477A769C03A56D1401 /* ofxSlider.cpp */; };
 		856AA354D08AB4B323081444 /* ofxBaseGui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9604B925D32EE39065747725 /* ofxBaseGui.cpp */; };
@@ -191,6 +192,7 @@
 		6E473B331F74F01C0075777D /* ContoursSender.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ContoursSender.hpp; sourceTree = "<group>"; };
 		6E473B351F74FF120075777D /* Settings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Settings.cpp; sourceTree = "<group>"; };
 		6E473B361F74FF120075777D /* Settings.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Settings.hpp; sourceTree = "<group>"; };
+		6E473B451F78F95D0075777D /* pylon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = pylon.framework; sourceTree = "<group>"; };
 		6FD36D0AA497C485B6B18831 /* DeckLinkAPIVersion.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = DeckLinkAPIVersion.h; path = ../../../addons/ofxBlackmagic/libs/DeckLink/include/DeckLinkAPIVersion.h; sourceTree = SOURCE_ROOT; };
 		70046E043EDDB466ED625C3B /* Tracker.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = Tracker.h; path = ../../../addons/ofxCv/libs/ofxCv/include/ofxCv/Tracker.h; sourceTree = SOURCE_ROOT; };
 		7101CF2125B8B2BF46AA2662 /* cxcore.hpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = cxcore.hpp; path = ../../../addons/ofxOpenCv/libs/opencv/include/opencv/cxcore.hpp; sourceTree = SOURCE_ROOT; };
@@ -367,6 +369,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E4328149138ABC9F0047C5CB /* openFrameworksDebug.a in Frameworks */,
+				6E473B461F78F95D0075777D /* pylon.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1041,6 +1044,7 @@
 		E4B69B4A0A3A1720003C02F2 = {
 			isa = PBXGroup;
 			children = (
+				6E473B451F78F95D0075777D /* pylon.framework */,
 				E4B6FCAD0C3E899E008CF71C /* openFrameworks-Info.plist */,
 				E4EB6923138AFD0F00A09F29 /* Project.xcconfig */,
 				E4B69E1C0A3A1BDC003C02F2 /* src */,
@@ -1424,6 +1428,8 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
+					"$(PROJECT_DIR)",
+					"$(PYLON_LIBRARY_DIR)/Frameworks",
 				);
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../../../libs/glut/lib/osx\"";
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -1474,11 +1480,13 @@
 					../../../addons/ofxOpenCv/src,
 					../../../addons/ofxXmlSettings/libs,
 					../../../addons/ofxXmlSettings/src,
+					"$(PYLON_LIBRARY_DIR)/Frameworks/pylon.framework/Headers/GenICam",
 				);
 				ICON = "$(ICON_NAME_DEBUG)";
 				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
 				INFOPLIST_FILE = "openFrameworks-Info.plist";
 				INSTALL_PATH = /Applications;
+				LD_RUNPATH_SEARCH_PATHS = "$(PYLON_LIBRARY_DIR)/Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				OTHER_LDFLAGS = (
 					"$(OF_CORE_FRAMEWORKS)",
@@ -1486,6 +1494,7 @@
 					../../../addons/ofxOpenCv/libs/opencv/lib/osx/opencv.a,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)Debug";
+				PYLON_LIBRARY_DIR = /Library;
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -1499,6 +1508,8 @@
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
+					"$(PROJECT_DIR)",
+					"$(PYLON_LIBRARY_DIR)/Frameworks",
 				);
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../../../libs/glut/lib/osx\"";
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
@@ -1548,11 +1559,13 @@
 					../../../addons/ofxOpenCv/src,
 					../../../addons/ofxXmlSettings/libs,
 					../../../addons/ofxXmlSettings/src,
+					"$(PYLON_LIBRARY_DIR)/Frameworks/pylon.framework/Headers/GenICam",
 				);
 				ICON = "$(ICON_NAME_RELEASE)";
 				ICON_FILE = "$(ICON_FILE_PATH)$(ICON)";
 				INFOPLIST_FILE = "openFrameworks-Info.plist";
 				INSTALL_PATH = /Applications;
+				LD_RUNPATH_SEARCH_PATHS = "$(PYLON_LIBRARY_DIR)/Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				OTHER_LDFLAGS = (
 					"$(OF_CORE_FRAMEWORKS)",
@@ -1560,6 +1573,7 @@
 					../../../addons/ofxOpenCv/libs/opencv/lib/osx/opencv.a,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PYLON_LIBRARY_DIR = /Library;
 				WRAPPER_EXTENSION = app;
 				baseConfigurationReference = E4EB6923138AFD0F00A09F29;
 			};
