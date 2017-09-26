@@ -1,6 +1,7 @@
 #include "ofApp.h"
 
 void ofApp::setup(){
+    ofSetWindowShape(settings.projectorWidth, settings.projectorHeight);
     ofSetFrameRate(120);
     ofSetVerticalSync(false);
     
@@ -57,14 +58,6 @@ void ofApp::draw(){
             }
             else{
                 contoursExtractor.drawContours();
-                ofPushStyle();
-                ofSetColor(ofColor::gray);
-                polyline.draw();
-                for(auto & p : ofCaptureAreaCorners)
-                {
-                    ofDrawCircle(p.x, p.y, cornerPinRadius);
-                }
-                ofPopStyle();
             }
             break;
             
@@ -80,6 +73,15 @@ void ofApp::draw(){
     }
     
     if(drawGui){
+        ofPushStyle();
+        ofNoFill();
+        ofSetColor(ofColor::gray);
+        ofDrawRectangle(ofRectangle(ofPoint(1.0, 1.0), ofPoint(settings.projectorWidth - 1.0, settings.projectorHeight - 1.0)));
+        polyline.draw();
+        for(auto & p : ofCaptureAreaCorners){
+            ofDrawCircle(p.x, p.y, cornerPinRadius);
+        }
+        ofPopStyle();
         gui.draw();
     }
 }
@@ -89,6 +91,11 @@ void ofApp::keyPressed(int key){
         case ' ':
             contoursExtractor.toggleLearnBackground();
             break;
+            
+        case 'g':
+            drawGui = !drawGui;
+            break;
+            
         case 'p':
             currentStatus = Status::Play;
             break;
