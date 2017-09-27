@@ -15,7 +15,9 @@ namespace contourfinder{
             void toggleLearnBackground();
             void setThreashold(int threashold);
             void setSimplicity(int polylinesSimplicity);
-            void setWarpPerspectiveTransform(std::vector<ofVec2f> const & ofCaptureAreaCorners, std::vector<ofVec2f>  const & ofWindowCorners);
+        void setWarpPerspectiveTransform(std::vector<ofVec2f> const & ofCaptureAreaCorners, std::vector<ofVec2f> const & ofVideoCorners, std::vector<ofVec2f>  const & ofWindowCorners);
+            void applyWarpPerspectiveTransform();
+            void resetWarpPerspectiveTransform();
             void setMaxblobsCount(int count);
             std::vector<ofPolyline> const & getPolylines();
             int  contoursCount();
@@ -30,6 +32,7 @@ namespace contourfinder{
             ofShader                shader;
             ofFbo                   fbo;
             ofMatrix3x3             warpMatrix;
+            ofMatrix3x3             shaderWarpMatrix;
             ofPlanePrimitive        plane;
             ofPixels                pixels;
             std::vector<ofPolyline> polylines;

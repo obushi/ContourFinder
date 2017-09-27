@@ -25,7 +25,7 @@ void ofApp::setup(){
     
     videoSource.setup(settings);
     contoursExtractor.setup(settings);
-    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofWindowCorners);
+    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofVideoCorners, ofWindowCorners);
     contoursSender.setup(settings);
 }
 
@@ -104,6 +104,14 @@ void ofApp::keyPressed(int key){
             currentStatus = Status::Setup;
             break;
             
+        case 'r':
+            contoursExtractor.resetWarpPerspectiveTransform();
+            break;
+            
+        case OF_KEY_RETURN:
+            contoursExtractor.applyWarpPerspectiveTransform();
+            break;
+            
         case OF_KEY_LEFT:
             threashold--;
             ofLog() << "Threshold: " << ofToString(threashold) << std::endl;
@@ -139,7 +147,7 @@ void ofApp::mouseDragged(int x, int y, int button){
         polyline.addVertex(p);
     }
     
-    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofWindowCorners);
+    contoursExtractor.setWarpPerspectiveTransform(ofCaptureAreaCorners, ofVideoCorners, ofWindowCorners);
 }
 
 void ofApp::mousePressed(int x, int y, int button){
